@@ -1,0 +1,64 @@
+name: Build & Release
+
+on:
+  workflow_dispatch: # Allows you to manually trigger the build from GitHub Actions tab
+  push:
+    tags:
+      - 'v*' # Automatically triggers when you push a version tag like 'v1.0.0'
+
+jobs:
+  build:
+    name: Build APK and IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Inject Secrets
+        run: |
+          # Inject Firebase config
+          echo "${{ secrets.FIREBASE_OPTIONS_DART }}" > lib/firebase_options.dart
+          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > android/app/google-services.json
+          
+          # Inject Groq API Key
+          sed -i '' "s/YOUR_GROQ_API_KEY_HERE/${{ secrets.GROQ_API_KEY }}/g" lib/services/groq_service.dart
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: StudyZen-Android-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Build iOS (Unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package iOS into IPA
+        run: |
+          mkdir -p Payload
+          mv build/ios/iphoneos/Runner.app Payload/
+          zip -r StudyZen-iOS.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v3
+        with:
+          name: StudyZen-iOS-IPA
+          path: StudyZen-iOS.ipa
