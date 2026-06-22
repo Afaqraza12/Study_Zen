@@ -27,13 +27,20 @@ jobs:
           channel: 'stable'
 
       - name: Inject Secrets
+        env:
+          FIREBASE_OPTIONS: ${{ secrets.FIREBASE_OPTIONS_DART }}
+          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          GROQ_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          # Inject Firebase config
-          echo "${{ secrets.FIREBASE_OPTIONS_DART }}" > lib/firebase_options.dart
-          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > android/app/google-services.json
+          # Inject Firebase config safely via environment variables
+          echo "$FIREBASE_OPTIONS" > lib/firebase_options.dart
+          echo "$GOOGLE_SERVICES" > android/app/google-services.json
           
-          # Inject Groq API Key
-          sed -i '' "s/YOUR_GROQ_API_KEY_HERE/${{ secrets.GROQ_API_KEY }}/g" lib/services/groq_service.dart
+          # Clean up any accidental newlines in the Groq key
+          CLEAN_GROQ_KEY=$(echo "$GROQ_KEY" | tr -d '\n\r')
+          
+          # Inject Groq API Key safely
+          sed -i '' "s/YOUR_GROQ_API_KEY_HERE/${CLEAN_GROQ_KEY}/g" lib/services/groq_service.dart
 
       - name: Install Dependencies
         run: flutter pub get
